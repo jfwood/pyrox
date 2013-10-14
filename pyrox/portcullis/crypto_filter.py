@@ -1,5 +1,7 @@
 import pyrox.filtering as filtering
 
+from Crypto.Cipher import AES
+
 
 def process_chunk(msg_part, processor, output):
     if msg_part:
@@ -87,46 +89,57 @@ class CryptoFilter(filtering.HttpFilter):
 class SampleCryptoProcessor(object):
     def __init__(self, is_encrypt, block_size_bytes=16):
         self.block_size_bytes = block_size_bytes
-        self.buffer = str()  #TODO(jwood) Use a bytearray() structure here!
         self.block_method = self._encrypt_block if is_encrypt else self._decrypt_block
+        self.encryptor = AES.new('sixteen_byte_key', AES.MODE_CBC, 'sixteen_byte_iv!')
+        self.decryptor = AES.new('sixteen_byte_key', AES.MODE_CBC, 'sixteen_byte_iv!')
+        self.last_block = ''
+        self.is_encrypt = is_encrypt
 
     def process_data(self, data):
         """Accept and process the input 'data' block by applying the 'block_method()'
         to it. Return an 'output' that is a modulo of this processor's block size, which
         may not be evenly aligned with the input data's size.
         """
-        output = str()
-        self.buffer = ''.join([self.buffer, data])
-        while len(self.buffer) >= self.block_size_bytes:  #TODO(jwood) How reliable is 'len()' over random binary bytes?
-            output = ''.join([output,
-                     self.block_method(self.buffer[:self.block_size_bytes])])
-            self.buffer = self.buffer[self.block_size_bytes:]
+        buff = ''.join([self.last_block, data])
+        len_buff = len(buff)
+        if len_buff <= self.block_size_bytes:
+            self.last_block = buff
+            return ''
+
+        len_buff_modulo = len_buff - (len_buff % self.block_size_bytes)
+        if not len_buff % self.block_size_bytes:
+            len_buff_modulo -= self.block_size_bytes
+        self.last_block = buff[len_buff_modulo:]
+        output = self.block_method(buff[:len_buff_modulo])
         return output
 
     def finish(self):
         """Indicate that we are finished using this data structure, so need to output based on existing buffer data."""
-        if not len(self.buffer):
-            return self.buffer
-        output = self.block_method(self.buffer)
-        self.buffer = str()
+        if self.is_encrypt:
+            output = self._pad(self.last_block)
+            output = self.block_method(output)
+        else:
+            output = self.block_method(self.last_block)
+            output = self._strip_pad(output)
+        self.last_block = ''
         return output
 
     #TODO(reaperhulk) Make this secure. ;)
     def _encrypt_block(self, block):
-        size = len(block)
-
-        # If even multiple of block size, do normal processing.
-        if not size % self.block_size_bytes:
-            output = block.upper()
-
-        # Else, pad to the block size.
-        else:
-            pad_length = self.block_size_bytes - size
-            output = ''.join([block.upper(), '-' * pad_length])
-
-        return output
+        return self.encryptor.encrypt(block)
 
     #TODO(reaperhulk) Make this secure. ;)
     def _decrypt_block(self, block):
-        #TODO(jwood) Deal with un-padding encrypted data.
-        return block.lower()
+        return self.decryptor.decrypt(block)
+
+    def _pad(self, unencrypted):
+        """Adds padding to unencrypted byte string."""
+        pad_length = self.block_size_bytes - (
+            len(unencrypted) % self.block_size_bytes
+        )
+        return unencrypted + (chr(pad_length) * pad_length)
+
+    def _strip_pad(self, unencrypted):
+        pad_length = ord(unencrypted[-1:])
+        unpadded = unencrypted[:-pad_length]
+        return unpadded
