@@ -158,6 +158,7 @@ cdef class HttpEventParser(object):
             if isinstance(data, list) or isinstance(data, bytearray):
                 strval = str(data)
             else:
+                print(">>>>>>>>>>> dddddddddata:{}".format(data))
                 raise Exception('Can not coerce type: {} into str.'.format(
                     type(data)))
 

@@ -137,10 +137,18 @@ def start_proxy(sockets, config):
         _LOG.exception(ex)
         return -1
 
+    #TODO(jwood) Get SSL info from config file.
+    ssl_options = None
+    #     {
+    #     "certfile": "/Users/john.wood/projects/security/tornado_related/pyrox/test.crt",
+    #     "keyfile": "/Users/john.wood/projects/security/tornado_related/pyrox/test.key"
+    # }
+
     # Create proxy server ref
     http_proxy = TornadoHttpProxy(
         filter_pipeline_factories,
-        config.routing.upstream_hosts)
+        config.routing.upstream_hosts,
+        ssl_options=ssl_options)
 
     # Add our sockets for watching
     http_proxy.add_sockets(sockets)
@@ -156,8 +164,12 @@ def start_pyrox(other_cfg=None):
     logging_manager = get_log_manager()
     logging_manager.configure(config)
 
-    _LOG.info('Upstream targets are: {}'.format(
-        ['http://{0}:{1}'.format(dst[0], dst[1])
+    # dst = config.routing.upstream_hosts
+    # print("________ dst:{}".format(dst))
+    # print("________ dst0/1:{0}/{1}".format(dst[0], dst[1]))
+
+    _LOG.info('Upstream targets areeee: {}'.format(
+        ['https://{0}:{1}'.format(dst[0], dst[1])
             for dst in config.routing.upstream_hosts]))
 
     # Set bind host

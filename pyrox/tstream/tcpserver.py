@@ -195,6 +195,7 @@ class TCPServer(object):
         if self.ssl_options is not None:
             assert ssl, "Python 2.6+ and OpenSSL required for SSL"
             try:
+                print("!!!!!! ssl options: {}".format(self.ssl_options))
                 connection = ssl_wrap_socket(connection,
                                              self.ssl_options,
                                              server_side=True,

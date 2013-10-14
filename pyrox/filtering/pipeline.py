@@ -243,6 +243,10 @@ class HttpFilterPipeline(object):
                 action = method(body_part, output)
             except Exception as ex:
                 _LOG.exception(ex)
+
+                if False:
+                    raise Exception("eeeeeeeeeeeeeeee body length: {0}, lastaction: {1}".format(len(body_part), last_action))
+
                 action = reject()
 
             if action:

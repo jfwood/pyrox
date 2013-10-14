@@ -1,4 +1,5 @@
 import socket
+import ssl
 
 import tornado
 import tornado.ioloop
@@ -6,7 +7,7 @@ import tornado.process
 
 from .routing import RoutingHandler
 
-from pyrox.tstream.iostream import IOStream, StreamClosedError
+from pyrox.tstream.iostream import IOStream, StreamClosedError, SSLIOStream
 from pyrox.tstream.tcpserver import TCPServer
 
 from pyrox.log import get_logger
@@ -131,13 +132,20 @@ class DownstreamHandler(ProxyHandler):
     def on_body(self, bytes, length, is_chunked):
         # Rejections simply discard the body
         if not self._rejected:
+
+            print("!!!! length: {0}/{1} - is chunked: {2}".format(length, len(bytes), is_chunked))
+
             accumulator = AccumulationStream()
-            data = bytes[:length]
+            data = bytes[:length] if bytes else b""
 
             self._filter_pl.on_request_body(data, accumulator)
 
             if accumulator.size() > 0:
                 data = accumulator.bytes
+
+            if not data:
+                print(">>>>> no data seen")
+                return
 
             if self._upstream:
                 # Write the content
@@ -159,6 +167,7 @@ class DownstreamHandler(ProxyHandler):
                 callback=callback)
         elif is_chunked:
             print('closing downstream chunk')
+            self.on_body(b"", 0, is_chunked)
             self._upstream.write(_CHUNK_CLOSE)
 
 
@@ -255,8 +264,23 @@ class ConnectionTracker(object):
         us_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         us_sock.setblocking(0)
 
+        us_sock = ssl.wrap_socket(us_sock, do_handshake_on_connect=False)
+
+        # Works! target = ('storage101.dfw1.clouddrive.com', 443)
+        # target = ('storage101.dfw1.clouddrive.com/v1/MossoCloudFS_a1d4e46d-4091-49f4-a532-7ce73823623b',443)
+        # target = ('www.verisign.com', 443)
+
+        print('!!!!!! target: {}'.format(target))
+
+
+        #TODO(jwood) Get SSL info from config file.
+        ssl_options = {
+            "certfile": "/Users/john.wood/projects/security/tornado_related/pyrox/test.crt",
+            "keyfile": "/Users/john.wood/projects/security/tornado_related/pyrox/test.key"
+        }
+
         # Create and bind the IOStream
-        live_stream = IOStream(us_sock)
+        live_stream = SSLIOStream(us_sock)  #TODO(jwood), ssl_options=ssl_options)
         self._streams[target] = live_stream
 
         def on_close():
@@ -377,8 +401,8 @@ class TornadoHttpProxy(TCPServer):
                       as the first element and the downstream filter pipeline
                       factory as the second element.
     """
-    def __init__(self, pipeline_factories, default_us_targets=None):
-        super(TornadoHttpProxy, self).__init__()
+    def __init__(self, pipeline_factories, default_us_targets=None, ssl_options=None):
+        super(TornadoHttpProxy, self).__init__(ssl_options=ssl_options)
         self._router = RoutingHandler(default_us_targets)
         self.us_pipeline_factory = pipeline_factories[0]
         self.ds_pipeline_factory = pipeline_factories[1]

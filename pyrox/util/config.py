@@ -18,6 +18,7 @@ def load_config(cfg_module_name, location, defaults=None):
 
     cfg = ConfigParser()
     cfg.read(location)
+    print("--------- cfg.routing: {}".format(cfg.__dict__))
 
     return Configuration(_find_cfg_classes(cfg_module_name), cfg, defaults)
 
