@@ -142,6 +142,8 @@ class DownstreamHandler(ProxyHandler):
 
             if accumulator.size() > 0:
                 data = accumulator.bytes
+	    else:
+		return
 
             if not data:
                 print(">>>>> no data seen")
@@ -166,7 +168,7 @@ class DownstreamHandler(ProxyHandler):
                 self._response.to_bytes(),
                 callback=callback)
         elif is_chunked:
-            print('closing downstream chunk')
+            print('!!!!!!!!  closing downstream chunk')
             self.on_body(b"", 0, is_chunked)
             self._upstream.write(_CHUNK_CLOSE)
 
@@ -214,6 +216,12 @@ class UpstreamHandler(ProxyHandler):
 
             if accumulator.size() > 0:
                 data = accumulator.bytes
+            else:
+                return
+
+            if not data:
+                print("<<<<< no data seen")
+                return
 
             _write_to_stream(
                 self._downstream,
@@ -230,6 +238,7 @@ class UpstreamHandler(ProxyHandler):
 
         if is_chunked or self._chunked:
             # Finish the last chunk.
+            self.on_body(b"", 0, is_chunked)
             self._downstream.write(
                 _CHUNK_CLOSE,
                 callback=callback)
